@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; color: #0ff; pointer-events: none; font-size: 14px; text-shadow: 0 0 5px #0ff; }
+        #btn { position: absolute; bottom: 20px; left: 20px; padding: 10px 20px; background: rgba(0,255,255,0.1); border: 1px solid #0ff; color: #0ff; border-radius: 20px; }
+    </style>
+</head>
+<body>
+    <div id="ui">Δ-Space 2.1: あの「ヌルヌル」を再現<br>壁に沿って加速する流体知能</div>
+    <button id="btn" onclick="walls.clear()">壁をリセット</button>
+    <canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let w, h, walls = new Set(), pts = [];
+const size = 18; // 少し細かく
+
+function res() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+}
+
+function initPts() {
+    pts = [];
+    for(let i=0; i<1200; i++) {
+        pts.push({x: 20+Math.random()*40, y: 20+Math.random()*40, vx:0, vy:0});
+    }
+}
+
+const getK = (x, y) => `${Math.floor(x/size)},${Math.floor(y/size)}`;
+const drawWall = (e) => {
+    const t = e.touches ? e.touches[0] : e;
+    walls.add(getK(t.clientX, t.clientY));
+};
+canvas.ontouchmove = drawWall;
+canvas.onmousedown = (e) => { canvas.onmousemove = drawWall; };
+window.onmouseup = () => { canvas.onmousemove = null; };
+
+function loop() {
+    ctx.fillStyle = 'rgba(0,5,15,0.4)'; // 深みのある残像
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = '#222';
+    walls.forEach(k => {
+        const [x, y] = k.split(',').map(Number);
+        ctx.fillRect(x*size, y*size, size-1, size-1);
+    });
+
+    ctx.fillStyle = '#0ff';
+    pts.forEach(p => {
+        let gx = w-40, gy = h-40;
+        let dx = gx-p.x, dy = gy-p.y;
+        let d = Math.sqrt(dx*dx+dy*dy);
+        
+        // 1. 基本の推進力
+        let ax = dx/d * 0.6, ay = dy/d * 0.6;
+
+        // 2. Δ-Flow（ここが「懐かしいアイツラ」の肝）
+        // 進行方向に壁があったら、単に止まるのではなく「左右どちらか通りやすい方」へ急旋回
+        if (walls.has(getK(p.x + ax*20, p.y + ay*20))) {
+            // 右回転と左回転、壁がない方を瞬時に判断
+            let rx = -ay, ry = ax;
+            let lx = ay, ly = -ax;
+            if (!walls.has(getK(p.x + rx*30, p.y + ry*30))) {
+                ax = rx * 1.5; ay = ry * 1.5; // 壁に沿って加速！
+            } else {
+                ax = lx * 1.5; ay = ly * 1.5;
+            }
+        }
+
+        p.vx = (p.vx + ax) * 0.93;
+        p.vy = (p.vy + ay) * 0.93;
+
+        // 3. 鉄壁のめり込み防止
+        let nx = p.x + p.vx, ny = p.y + p.vy;
+        if (walls.has(getK(nx, ny))) {
+            p.vx *= -0.1; p.vy *= -0.1;
+        } else {
+            p.x = nx; p.y = ny;
+        }
+
+        ctx.fillRect(p.x, p.y, 2, 2);
+
+        if(d < 15 || p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
+            p.x = 20; p.y = 20; p.vx = 0; p.vy = 0;
+        }
+    });
+
+    requestAnimationFrame(loop);
+}
+
+window.onresize = res;
+res(); initPts(); loop();
+</script>
+</body>
+</html>

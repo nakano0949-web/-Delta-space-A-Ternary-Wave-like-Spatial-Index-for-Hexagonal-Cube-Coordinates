@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Delta-A* Mobile</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; color: #fff; font-family: sans-serif; touch-action: none; }
+        canvas { display: block; }
+        #info { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 5px; font-size: 12px; pointer-events: none; border: 1px solid #444; }
+        .key { color: #0f0; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <b style="color: #0f0;">Delta-A* Mobile Engine</b><br>
+        ・<span class="key">なぞる</span>: 壁（障害物）を描く<br>
+        ・<span class="key">タップ</span>: ゴールを移動<br>
+        Agents: 10,000 | Logic: Delta-L1
+    </div>
+    <canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let width, height, scale;
+
+const AGENT_COUNT = 10000;
+const agents = [];
+const walls = new Set();
+let goal = { x: 30, y: 0, z: -30 };
+let isTouching = false;
+
+const DIR6 = [[1,-1,0], [1,0,-1], [0,1,-1], [-1,1,0], [-1,0,1], [0,-1,1]];
+
+for (let i = 0; i < AGENT_COUNT; i++) {
+    let x = -50 + Math.random()*10;
+    let y = Math.random()*40-20;
+    agents.push({ x, y, z: -(x+y), vx: 0, vy: 0, color: `hsl(${190 + Math.random()*30}, 100%, 50%)` });
+}
+
+const getDeltaDist = (p1, p2) => (Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y) + Math.abs(p1.z - p2.z)) / 2;
+const toKey = (x, y, z) => `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+
+// update関数を「賢いモード」に書き換え
+function update() {
+    // 空間に「ゴールへの勾配（坂道）」を作る
+    // 本来はDelta-treeで計算しますが、JSでは簡易的に実装
+    for (let a of agents) {
+        let bestDir = null;
+        let minDist = getDeltaDist(a, goal);
+        
+        // 1. 周囲6方向を確認
+        for (let d of DIR6) {
+            let nx = a.x + d[0], ny = a.y + d[1], nz = a.z + d[2];
+            
+            // 壁があったら「うわ、通れない！」と認識
+            if (walls.has(toKey(nx, ny, nz))) continue;
+
+            let dist = getDeltaDist({x:nx, y:ny, z:nz}, goal);
+            if (dist < minDist) {
+                minDist = dist;
+                bestDir = d;
+            }
+        }
+
+        // 2. 健気に移動する
+        if (bestDir) {
+            a.vx += bestDir[0] * 0.18;
+            a.vy += bestDir[1] * 0.18;
+        }
+
+        // 3. 壁にぶつかったら「ぷるん」と跳ね返る（突き破り防止）
+        let nextX = a.x + a.vx;
+        let nextY = a.y + a.vy;
+        if (walls.has(toKey(nextX, nextY, -(nextX + nextY)))) {
+            a.vx *= -0.5; // 跳ね返り
+            a.vy *= -0.5;
+        } else {
+            a.x = nextX;
+            a.y = nextY;
+            a.z = -(a.x + a.y);
+        }
+        
+        a.vx *= 0.85; a.vy *= 0.85; // 摩擦
+    }
+}
+// 空間のコストマップ（ゴールへの歩数）
+const costMap = new Map();
+
+function updateWavefront() {
+    costMap.clear();
+    let queue = [{x: Math.round(goal.x), y: Math.round(goal.y), z: Math.round(goal.z), dist: 0}];
+    costMap.set(toKey(goal.x, goal.y, goal.z), 0);
+
+    // ゴールから波を広げる
+    while(queue.length > 0) {
+        let current = queue.shift();
+        if (current.dist > 100) continue; // 探索範囲を制限して軽くする
+
+        for (let d of DIR6) {
+            let nx = current.x + d[0], ny = current.y + d[1], nz = current.z + d[2];
+            let key = toKey(nx, ny, nz);
+            if (walls.has(key) || costMap.has(key)) continue;
+
+            costMap.set(key, current.dist + 1);
+            queue.push({x: nx, y: ny, z: nz, dist: current.dist + 1});
+        }
+    }
+}
+// 2つのコストマップを用意
+const escapeMap = new Map(); // 逃げるための地図
+const chaseMap = new Map();  // 追うための地図
+
+function updateStrategy() {
+    // 1. 追っ手の位置から「逃走の波」を広げる
+    updateWavefront(escapeMap, pursuerPosition); 
+    
+    // 2. 逃げる側の位置から「追跡の波」を広げる
+    updateWavefront(chaseMap, runnerPosition);
+
+    // 3. 各個体は自分の役割に応じた波を見て移動
+    for (let a of runners) a.moveTowardsHigher(escapeMap);
+    for (let p of pursuers) p.moveTowardsLower(chaseMap);
+}
+
+
+function draw() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.fillRect(0, 0, width, height);
+    ctx.save();
+    ctx.translate(width/2, height/2);
+
+    // 壁
+    ctx.fillStyle = '#444';
+    for (let key of walls) {
+        const [wx, wy] = key.split(',').map(Number);
+        ctx.fillRect(wx * scale - 1, wy * scale - 1, scale, scale);
+    }
+
+    // ゴール
+    ctx.fillStyle = '#0f0';
+    ctx.beginPath(); ctx.arc(goal.x * scale, goal.y * scale, 8, 0, Math.PI*2); ctx.fill();
+
+    // エージェント
+    for (let a of agents) {
+        ctx.fillStyle = a.color;
+        ctx.fillRect(a.x * scale, a.y * scale, 1.5, 1.5);
+    }
+    ctx.restore();
+}
+
+// タッチ・マウス共通入力処理
+const handleInput = (clientX, clientY, move) => {
+    const x = (clientX - width/2) / scale;
+    const y = (clientY - height/2) / scale;
+    if (move) {
+        // 壁を描く（なぞった時）
+        for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) walls.add(toKey(x+i, y+j, -(x+i+y+j)));
+    } else {
+        // ゴールを置く（タップした時）
+        goal = { x, y, z: -(x+y) };
+    }
+};
+
+// タッチイベントの設定
+canvas.addEventListener('touchstart', (e) => {
+    isTouching = true;
+    handleInput(e.touches[0].clientX, e.touches[0].clientY, false);
+}, {passive: false});
+
+canvas.addEventListener('touchmove', (e) => {
+    if(!isTouching) return;
+    handleInput(e.touches[0].clientX, e.touches[0].clientY, true);
+    e.preventDefault(); // 画面スクロールを防止
+}, {passive: false});
+
+window.addEventListener('touchend', () => isTouching = false);
+
+// PC用マウスイベントも維持
+canvas.addEventListener('mousedown', (e) => { isTouching = true; handleInput(e.clientX, e.clientY, false); });
+canvas.addEventListener('mousemove', (e) => { if(isTouching) handleInput(e.clientX, e.clientY, true); });
+window.addEventListener('mouseup', () => isTouching = false);
+
+function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+    scale = Math.min(width, height) / 120;
+}
+window.addEventListener('resize', resize);
+resize();
+(function loop() { update(); draw(); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>
