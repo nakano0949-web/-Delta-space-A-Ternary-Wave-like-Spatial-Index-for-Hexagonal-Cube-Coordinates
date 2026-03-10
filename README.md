@@ -1,4 +1,4 @@
-https://doi.org/10.5281/zenodo.18941064
+ttps://doi.org/10.5281/zenodo.18941064)
 Delta-space is a new **ternary, wave-like spatial indexing framework** for hexagonal grids represented in cube coordinates  
 \((x, y, z)\) with the constraint \(x + y + z = 0\).
 
