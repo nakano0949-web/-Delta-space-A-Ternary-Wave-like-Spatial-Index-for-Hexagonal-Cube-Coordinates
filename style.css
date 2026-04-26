@@ -1,0 +1,78 @@
+:root {
+    --neon: #00e5ff;
+    --bg: #050505;
+    --panel: rgba(10, 20, 25, 0.95);
+    --border: #005a64;
+    --accent: #00ff88;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--neon);
+    font-family: 'Consolas', monospace;
+    overflow: hidden;
+}
+
+#canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+.panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 340px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    z-index: 10;
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.panel.collapsed {
+    height: 30px;
+    width: 220px;
+    overflow: hidden;
+}
+
+.key-box {
+    background: rgba(0, 255, 136, 0.05);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 10px;
+    margin: 15px 0;
+    font-size: 0.82em;
+    border-radius: 6px;
+    overflow-wrap: break-word;
+}
+
+.digit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
+    margin-top: 10px;
+}
+
+.digit-item {
+    color: #4fc3f7;
+    font-size: 0.75em;
+    border-left: 2px solid var(--border);
+    padding-left: 5px;
+}
+
+.guide {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    text-align: center;
+    color: #333;
+    font-size: 0.8em;
+    pointer-events: none;
+}
