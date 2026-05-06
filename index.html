@@ -3,24 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <title>Delta-space 2.0 | 6-Axis Greedy Engine</title>
-    <link href="style.css" rel="stylesheet"></link>
+    <link href="style.css" rel="stylesheet">
 </head>
 <body>
     <canvas id="canvas"></canvas>
+
     <div class="panel" id="ui-panel">
         <h2 style="margin:0 0 15px 0; font-size:1.2em;">Delta-space 2.0 (DIR6)</h2>
         <div class="info-content">
             <div id="coords">座標: (-, -, -)</div>
             <div class="key-box" id="key-display">Key: 0x----------------</div>
             <div id="dist">L1 Dist: 0</div>
+
             <div style="margin-top:15px; border-top:1px solid #005a64; padding-top:10px;">
-                <div style="font-size:0.8em; color:#88aeb2; margin-bottom:8px;">6-Axis Greedy Decomposition (12 Digits):</div>
+                <div style="font-size:0.8em; color:#88aeb2; margin-bottom:8px;">
+                    6-Axis Greedy Decomposition (12 Digits):
+                </div>
                 <div id="digits" class="digit-grid"></div>
             </div>
         </div>
     </div>
+
     <div class="guide">6-AXIS GREEDY RESIDUAL ENGINE | CLICK TO ENCODE</div>
 
-   <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
